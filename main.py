@@ -42,10 +42,21 @@ client = tda.auth.easy_client(
 
 stream_client = tda.streaming.StreamClient(client, account_id=account_id)
 
-async def read_stream():
+async def quote(symbol):
+    symbol = symbol.upper()
+    res = client.get_quote(symbol)
+    data = res.json()[symbol]
+    print('Symbol: ' + data['symbol'])
+    print('Open: $' + "{:.2f}".format(data['openPrice']))
+    print('Close/Current: $' + "{:.2f}".format(data['regularMarketLastPrice']))
+    modifier = "+" if data['netPercentChangeInDouble'] > 0 else "-"
+    print('Percent Change: ' + modifier + "{:.2f}".format(round(data['netPercentChangeInDouble'], 2)) + "%")
+
+async def login():
     await stream_client.login()
     await stream_client.quality_of_service(tda.streaming.StreamClient.QOSLevel.EXPRESS)
 
+async def read_book_stream():
     # Always add handlers before subscribing because many streams start sending
     # data immediately after success, and messages with no handlers are dropped.
     stream_client.add_nasdaq_book_handler(
@@ -55,4 +66,22 @@ async def read_stream():
     while True:
         await stream_client.handle_message()
 
-asyncio.run(read_stream())
+# asyncio.run(read_book_stream())
+
+# symbol = ""
+# while symbol != "exit":
+#     symbol = input("enter a symbol [exit to exit]: ")
+#     asyncio.run(quote(symbol))
+
+
+async def ohlcv_stream(symbols):
+    symbols = [str.upper() for str in symbols]
+    await login()
+    print("Logged in!")
+    stream_client.add_chart_equity_handler(lambda msg: print(json.dumps(msg, indent=4)))
+    print ("Added Handler")
+    await stream_client.chart_equity_subs(symbols)
+    print("Handling Message")
+    await stream_client.handle_message()
+
+asyncio.run(ohlcv_stream(['gme']))
